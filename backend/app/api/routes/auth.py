@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_db
 from app.core.security import create_access_token, hash_password, verify_password
-from app.models.user import User, UserRole, WorkerProfile
+from app.models.user import User, UserRole, WorkerAvailability, WorkerProfile
 from app.schemas.auth import (
     AvatarUpdateRequest,
     IdentityVerificationRequest,
@@ -17,6 +17,7 @@ from app.schemas.auth import (
     TokenResponse,
 )
 from app.schemas.users import UserRead, WorkerRead
+from app.services.assignment import assign_next_pending_order_to_worker
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -184,6 +185,8 @@ async def update_profile(
         profile = await db.get(WorkerProfile, current_user.id)
         if profile is not None:
             profile.city = payload.city
+            if profile.availability == WorkerAvailability.AVAILABLE:
+                await assign_next_pending_order_to_worker(db, current_user)
 
     try:
         await db.commit()

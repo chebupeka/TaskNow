@@ -648,6 +648,7 @@
       city: isWorker ? settingsCity : null,
     });
     syncSettingsForm();
+    await refreshSession();
     flashNotice("Профиль обновлен");
   }
 
