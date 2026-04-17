@@ -17,7 +17,7 @@ async def ensure_local_schema_columns() -> None:
             rows = await connection.execute(text("pragma table_info(users)"))
             existing_columns = {row[1] for row in rows}
             columns = {
-                "avatar_url": "varchar(1000)",
+                "avatar_url": "text",
                 "identity_status": "varchar(32) not null default 'not_verified'",
                 "passport_full_name": "varchar(160)",
                 "passport_number": "varchar(32)",
@@ -36,7 +36,8 @@ async def ensure_local_schema_columns() -> None:
             if "worker_amount" not in payment_columns:
                 await connection.execute(text("alter table payments add column worker_amount integer not null default 0"))
         elif dialect == "postgresql":
-            await connection.execute(text("alter table users add column if not exists avatar_url varchar(1000)"))
+            await connection.execute(text("alter table users add column if not exists avatar_url text"))
+            await connection.execute(text("alter table users alter column avatar_url type text"))
             await connection.execute(
                 text("alter table users add column if not exists identity_status varchar(32) not null default 'not_verified'")
             )

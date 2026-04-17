@@ -68,6 +68,7 @@
   let activeTab: "active" | "done" = "active";
   let dashboardSection: DashboardSection = "tasks";
   let loading = false;
+  let backgroundRefreshing = false;
   let notice = "";
   let noticeTimer: ReturnType<typeof setTimeout> | null = null;
   let error = "";
@@ -344,6 +345,39 @@
     unreadMessagesCount = await getUnreadMessagesCount(accessToken);
     if (dashboardSection === "messages") {
       await loadActiveChat();
+    }
+  }
+
+  async function refreshDashboardData() {
+    if (!accessToken || activeScreen !== "dashboard" || loading || backgroundRefreshing) return;
+    backgroundRefreshing = true;
+    try {
+      const freshUser = await getMe(accessToken);
+      currentUser = freshUser;
+      const freshRole = getCurrentRole(freshUser);
+
+      if (freshRole === "admin") {
+        adminDisputes = await listAdminDisputes(accessToken);
+        if (selectedAdminDispute) {
+          await loadAdminDispute(selectedAdminDispute.order.id);
+        }
+        return;
+      }
+
+      orders = await listMyOrders(accessToken);
+      notifications = freshRole === "worker" ? await listMyNotifications(accessToken, true) : [];
+      paymentsDashboard = await getMyPayments(accessToken);
+      workerReviews = freshRole === "worker" ? await listMyWorkerReviews(accessToken) : [];
+      unreadMessagesCount = await getUnreadMessagesCount(accessToken);
+
+      if (selectedOrder) {
+        selectedOrder = orders.find((order) => order.id === selectedOrder?.id) ?? selectedOrder;
+      }
+      if (dashboardSection === "messages") {
+        await loadActiveChat();
+      }
+    } finally {
+      backgroundRefreshing = false;
     }
   }
 
@@ -723,15 +757,13 @@
     if (accessToken) {
       void run(refreshSession);
     }
-    const chatPollTimer = setInterval(() => {
-      if (accessToken && activeScreen === "dashboard" && dashboardSection === "messages" && !loading) {
-        void loadActiveChat().catch(() => {
-          // Polling must not interrupt the current UI flow.
-        });
-      }
-    }, 4000);
+    const dashboardPollTimer = setInterval(() => {
+      void refreshDashboardData().catch(() => {
+        // Polling must not interrupt the current UI flow.
+      });
+    }, 1200);
 
-    return () => clearInterval(chatPollTimer);
+    return () => clearInterval(dashboardPollTimer);
   });
 </script>
 

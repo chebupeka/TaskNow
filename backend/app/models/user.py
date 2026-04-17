@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from enum import Enum
 from uuid import UUID as PyUUID, uuid4
 
-from sqlalchemy import Boolean, DateTime, Enum as SAEnum, Float, ForeignKey, Integer, JSON, String, Uuid
+from sqlalchemy import Boolean, DateTime, Enum as SAEnum, Float, ForeignKey, Integer, JSON, String, Text, Uuid
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -39,7 +39,7 @@ class User(Base):
     phone: Mapped[str | None] = mapped_column(String(32), unique=True, index=True)
     email: Mapped[str | None] = mapped_column(String(255), unique=True, index=True)
     hashed_password: Mapped[str | None] = mapped_column(String(255))
-    avatar_url: Mapped[str | None] = mapped_column(String(1000))
+    avatar_url: Mapped[str | None] = mapped_column(Text)
     identity_status: Mapped[str] = mapped_column(String(32), default="not_verified", nullable=False)
     passport_full_name: Mapped[str | None] = mapped_column(String(160))
     passport_number: Mapped[str | None] = mapped_column(String(32))
