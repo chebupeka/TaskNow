@@ -36,6 +36,9 @@
   type ChatMessageView = ChatMessage & { pending?: boolean };
 
   const tokenStorageKey = "tasknow.accessToken";
+  const screenStorageKey = "tasknow.activeScreen";
+  const dashboardSectionStorageKey = "tasknow.dashboardSection";
+  const paymentBadgeSeenCountStorageKey = "tasknow.paymentBadgeSeenCount";
   const heroImage =
     "https://images.unsplash.com/photo-1504917595217-d4dc5ebe6122?auto=format&fit=crop&w=1200&q=85";
   const authImage =
@@ -69,6 +72,7 @@
   let dashboardSection: DashboardSection = "tasks";
   let loading = false;
   let backgroundRefreshing = false;
+  let navigationRestored = false;
   let notice = "";
   let noticeTimer: ReturnType<typeof setTimeout> | null = null;
   let error = "";
@@ -88,6 +92,8 @@
   let selectedAdminDispute: AdminDisputeDetail | null = null;
   let adminDisputeId = "";
   let adminNote = "";
+  let rawPaymentBadgeCount = 0;
+  let seenPaymentBadgeCount = 0;
 
   let loginEmail = "customer@tasknow.local";
   let loginPassword = "password123";
@@ -95,12 +101,14 @@
   let registerEmail = "customer@tasknow.local";
   let registerPhone = "+7 900 000-10-01";
   let registerPassword = "password123";
+  let registerCity = "Москва";
   let selectedSkills: string[] = ["Погрузка"];
 
   let taskTitle = "Разгрузить мебель";
   let taskDescription = "Разгрузить мебель и аккуратно поднять коробки на второй этаж.";
   let taskBudget = "5000";
   let taskCategory = categories[0];
+  let taskCity = "Москва";
   let taskLocation = "Москва, ул. Тверская, 12";
   let taskScheduledAt = localDateTimeInput(Date.now() + 2 * 60 * 60 * 1000);
   let reviewScore = 5;
@@ -108,6 +116,7 @@
   let settingsName = "";
   let settingsEmail = "";
   let settingsPhone = "";
+  let settingsCity = "";
   let settingsAvatarUrl = "";
   let avatarUploadHint = "PNG или JPG, квадрат 512x512 px, до 1 МБ.";
   let avatarEditorOpen = false;
@@ -140,10 +149,19 @@
   $: taskBadgeCount = activeOrders.filter((order) =>
     isCustomer ? order.status === "completion_requested" : order.status === "assigned"
   ).length;
-  $: paymentBadgeCount = paymentsDashboard?.payments.filter((payment) =>
+  $: rawPaymentBadgeCount = paymentsDashboard?.payments.filter((payment) =>
     isCustomer ? payment.status === "held" : payment.status === "released"
   ).length ?? 0;
+  $: paymentBadgeCount = dashboardSection === "payments" ? 0 : Math.max(0, rawPaymentBadgeCount - seenPaymentBadgeCount);
   $: selectedOrderPayment = getOrderPayment(selectedOrder);
+  $: if (navigationRestored) {
+    localStorage.setItem(screenStorageKey, activeScreen);
+    localStorage.setItem(dashboardSectionStorageKey, dashboardSection);
+  }
+  $: if (navigationRestored && dashboardSection === "payments" && rawPaymentBadgeCount !== seenPaymentBadgeCount) {
+    seenPaymentBadgeCount = rawPaymentBadgeCount;
+    localStorage.setItem(paymentBadgeSeenCountStorageKey, String(seenPaymentBadgeCount));
+  }
 
   function setScreen(screen: Screen) {
     activeScreen = screen;
@@ -179,6 +197,10 @@
   function setDashboardSection(section: DashboardSection) {
     dashboardSection = section;
     clearFeedback();
+    if (section === "payments") {
+      seenPaymentBadgeCount = rawPaymentBadgeCount;
+      localStorage.setItem(paymentBadgeSeenCountStorageKey, String(seenPaymentBadgeCount));
+    }
     if (section === "messages") {
       void run(loadActiveChat);
     }
@@ -258,6 +280,10 @@
     return Boolean(currentUser && message.sender_id === currentUser.id);
   }
 
+  function isAdminMessage(message: ChatMessageView) {
+    return message.sender_role === "admin";
+  }
+
   function getMessageStatus(message: ChatMessageView) {
     if (message.pending) return "clock";
     return message.read_at ? "read" : "sent";
@@ -269,9 +295,29 @@
       .reduce((total, payment) => total + payment.amount, 0) ?? 0;
   }
 
+  function getPaymentFeeText(payment: Payment) {
+    return payment.status === "refunded" ? "без комиссии" : `комиссия ${formatMoney(payment.service_fee)}`;
+  }
+
+  function shouldShowPaymentCommission(payment: Payment | null) {
+    return Boolean(payment && payment.status !== "refunded");
+  }
+
   function getOrderPayment(order: Order | null): Payment | null {
     if (!order) return null;
     return paymentsDashboard?.payments.find((payment) => payment.order_id === order.id) ?? null;
+  }
+
+  function restoreScreen(value: string | null): Screen {
+    return ["home", "login", "register", "dashboard", "create"].includes(value ?? "")
+      ? (value as Screen)
+      : "home";
+  }
+
+  function restoreDashboardSection(value: string | null): DashboardSection {
+    return ["tasks", "payments", "messages", "reviews", "settings"].includes(value ?? "")
+      ? (value as DashboardSection)
+      : "tasks";
   }
 
   function getTimeline(order: Order) {
@@ -386,6 +432,7 @@
     settingsName = currentUser.full_name;
     settingsEmail = currentUser.email ?? "";
     settingsPhone = currentUser.phone ?? "";
+    settingsCity = getCurrentRole(currentUser) === "worker" ? (currentUser as Worker).city ?? "" : "";
     settingsAvatarUrl = currentUser.avatar_url ?? "";
     passportFullName = currentUser.full_name;
   }
@@ -435,6 +482,7 @@
       phone: registerPhone ? normalizePhone(registerPhone) : null,
       password: registerPassword,
       role: selectedRole,
+      city: selectedRole === "worker" ? registerCity : null,
       skills:
         selectedRole === "worker"
           ? selectedSkills
@@ -456,10 +504,10 @@
     if (role !== "customer") {
       throw new Error("Создавать задачи может только заказчик");
     }
-
     await createMyOrder(accessToken, {
       description: makeDescription(),
       budget_amount: Number(taskBudget.replace(/\D/g, "")) || 0,
+      city: taskCity,
       address: taskLocation,
       scheduled_at: new Date(taskScheduledAt).toISOString(),
     });
@@ -472,7 +520,11 @@
     if (!accessToken || role !== "worker") {
       throw new Error("Доступность может менять только работник");
     }
-    currentUser = await setMyWorkerAvailability(accessToken, "available");
+    const workerCity = workerProfile?.city;
+    if (!workerCity) {
+      throw new Error("Укажите город в профиле работника, чтобы получать заказы рядом");
+    }
+    currentUser = await setMyWorkerAvailability(accessToken, "available", workerCity);
     await refreshSession();
     flashNotice("Вы на смене");
   }
@@ -537,6 +589,7 @@
       id: `pending-${clientMessageId}`,
       order_id: selectedChatOrder.id,
       sender_id: currentUser.id,
+      sender_role: currentUser.role,
       body,
       sent_at: new Date().toISOString(),
       read_at: null,
@@ -592,6 +645,7 @@
       full_name: settingsName,
       email: settingsEmail,
       phone: settingsPhone ? normalizePhone(settingsPhone) : null,
+      city: isWorker ? settingsCity : null,
     });
     syncSettingsForm();
     flashNotice("Профиль обновлен");
@@ -742,6 +796,9 @@
 
   function logout() {
     localStorage.removeItem(tokenStorageKey);
+    localStorage.setItem(screenStorageKey, "home");
+    localStorage.setItem(dashboardSectionStorageKey, "tasks");
+    localStorage.removeItem(paymentBadgeSeenCountStorageKey);
     accessToken = "";
     currentUser = null;
     orders = [];
@@ -750,10 +807,17 @@
     selectedAdminDispute = null;
     adminDisputeId = "";
     activeScreen = "home";
+    dashboardSection = "tasks";
+    seenPaymentBadgeCount = 0;
   }
 
   onMount(() => {
     accessToken = localStorage.getItem(tokenStorageKey) ?? "";
+    dashboardSection = restoreDashboardSection(localStorage.getItem(dashboardSectionStorageKey));
+    seenPaymentBadgeCount = Number(localStorage.getItem(paymentBadgeSeenCountStorageKey)) || 0;
+    const savedScreen = restoreScreen(localStorage.getItem(screenStorageKey));
+    activeScreen = accessToken ? savedScreen : savedScreen === "dashboard" ? "home" : savedScreen;
+    navigationRestored = true;
     if (accessToken) {
       void run(refreshSession);
     }
@@ -948,6 +1012,10 @@
               <input bind:value={registerPassword} type="password" placeholder="Минимум 8 символов" required />
             </label>
             {#if selectedRole === "worker"}
+              <label>
+                Город
+                <input bind:value={registerCity} placeholder="Москва" required />
+              </label>
               <fieldset class="skills-selector">
                 <legend>Skills</legend>
                 {#each skillOptions as skill}
@@ -1037,7 +1105,13 @@
                   Завершить смену
                 </button>
               {:else}
-                <button class="primary-button compact" type="button" disabled={loading} on:click={() => run(setAvailable)}>
+                <button
+                  class="primary-button compact"
+                  type="button"
+                  disabled={loading}
+                  title="Заказы назначаются по городу из профиля"
+                  on:click={() => run(setAvailable)}
+                >
                   Выйти на смену
                 </button>
               {/if}
@@ -1083,8 +1157,12 @@
                     {#if selectedAdminDispute.payment}
                       <p>{paymentStatusLabels[selectedAdminDispute.payment.status]}</p>
                       <span>Бюджет: {formatMoney(selectedAdminDispute.payment.amount)}</span>
-                      <span>Комиссия сервиса: {formatMoney(selectedAdminDispute.payment.service_fee)}</span>
-                      <span>К выплате исполнителю: {formatMoney(selectedAdminDispute.payment.worker_amount)}</span>
+                      {#if shouldShowPaymentCommission(selectedAdminDispute.payment)}
+                        <span>Комиссия сервиса: {formatMoney(selectedAdminDispute.payment.service_fee)}</span>
+                        <span>К выплате исполнителю: {formatMoney(selectedAdminDispute.payment.worker_amount)}</span>
+                      {:else}
+                        <span>Возврат заказчику без комиссии</span>
+                      {/if}
                     {:else}
                       <p>Платеж не найден</p>
                     {/if}
@@ -1102,8 +1180,11 @@
                         <div class="chat-placeholder">Сообщений пока нет.</div>
                       {:else}
                         {#each selectedAdminDispute.messages as message (message.id)}
-                          <div class:own={isOwnMessage(message)} class="message-row">
+                          <div class:admin={isAdminMessage(message)} class:own={isOwnMessage(message)} class="message-row">
                             <div class="message-bubble">
+                              {#if isAdminMessage(message)}
+                                <span class="message-author-badge">Админ</span>
+                              {/if}
                               <p>{message.body}</p>
                               <span class="message-meta">{formatDate(message.sent_at)}</span>
                             </div>
@@ -1151,6 +1232,12 @@
                     Телефон
                     <input bind:value={settingsPhone} inputmode="tel" pattern="(?:\+7|8)[0-9\s().-]{10,16}" />
                   </label>
+                  {#if isWorker}
+                    <label>
+                      Город
+                      <input bind:value={settingsCity} placeholder="Москва" required />
+                    </label>
+                  {/if}
                   <button class="status-button" type="submit" disabled={loading}>Сохранить профиль</button>
                 </form>
               </article>
@@ -1248,7 +1335,7 @@
                     <article class="payment-row">
                       <div>
                         <strong>{payment.order_title ?? "Задача"}</strong>
-                        <span>{formatDate(payment.created_at)} · {paymentStatusLabels[payment.status]} · комиссия {formatMoney(payment.service_fee)}</span>
+                        <span>{formatDate(payment.created_at)} · {paymentStatusLabels[payment.status]} · {getPaymentFeeText(payment)}</span>
                       </div>
                       <b>{formatMoney(isWorker ? payment.worker_amount : payment.amount)}</b>
                     </article>
@@ -1298,8 +1385,11 @@
                       <div class="chat-placeholder">Сообщений пока нет. Напишите первое сообщение по заказу.</div>
                     {:else}
                       {#each chatMessages as message (message.id)}
-                        <div class:own={isOwnMessage(message)} class="message-row">
+                        <div class:admin={isAdminMessage(message)} class:own={isOwnMessage(message)} class="message-row">
                           <div class="message-bubble">
+                            {#if isAdminMessage(message)}
+                              <span class="message-author-badge">Админ</span>
+                            {/if}
                             <p>{message.body}</p>
                             <span class="message-meta">
                               {formatDate(message.sent_at)}
@@ -1493,7 +1583,11 @@
               </label>
             </div>
             <label>
-              Location
+              Город
+              <input bind:value={taskCity} placeholder="Москва" required />
+            </label>
+            <label>
+              Адрес
               <input bind:value={taskLocation} placeholder="Москва, ул. Тверская, 12" required />
             </label>
             <label>
@@ -1517,7 +1611,7 @@
       </section>
     {/if}
     {#if avatarEditorOpen}
-      <div class="modal-backdrop" role="presentation">
+      <div class="modal-backdrop" role="presentation" on:click|self={() => (avatarEditorOpen = false)}>
         <section class="avatar-editor" aria-label="Редактирование аватарки">
           <div class="avatar-editor-copy">
             <p class="eyebrow">Аватар</p>
@@ -1560,7 +1654,7 @@
       </div>
     {/if}
     {#if selectedOrder}
-      <div class="modal-backdrop" role="presentation">
+      <div class="modal-backdrop" role="presentation" on:click|self={() => (selectedOrder = null)}>
         <section class="order-details" aria-label="Подробности заказа">
           <div class="details-head">
             <div>
@@ -1582,8 +1676,12 @@
               {#if selectedOrderPayment}
                 <p>{paymentStatusLabels[selectedOrderPayment.status]}</p>
                 <span>Бюджет: {formatMoney(selectedOrderPayment.amount)}</span>
-                <span>Комиссия сервиса: {formatMoney(selectedOrderPayment.service_fee)}</span>
-                <span>Работнику: {formatMoney(selectedOrderPayment.worker_amount)}</span>
+                {#if shouldShowPaymentCommission(selectedOrderPayment)}
+                  <span>Комиссия сервиса: {formatMoney(selectedOrderPayment.service_fee)}</span>
+                  <span>Работнику: {formatMoney(selectedOrderPayment.worker_amount)}</span>
+                {:else}
+                  <span>Возврат заказчику без комиссии</span>
+                {/if}
               {:else}
                 <p>Платеж еще не создан</p>
               {/if}

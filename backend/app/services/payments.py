@@ -23,6 +23,11 @@ def sync_payment_amounts(payment: Payment, amount: int) -> None:
     payment.worker_amount = calculate_worker_amount(amount)
 
 
+def clear_refund_amounts(payment: Payment) -> None:
+    payment.service_fee = 0
+    payment.worker_amount = 0
+
+
 async def get_or_create_wallet(db: AsyncSession, user_id: UUID) -> Wallet:
     wallet = await db.get(Wallet, user_id)
     if wallet is None:

@@ -36,6 +36,7 @@ export interface Worker {
   rating_avg: number;
   rating_count: number;
   completed_orders: number;
+  city: string | null;
   current_lat: number | null;
   current_lng: number | null;
 }
@@ -52,6 +53,7 @@ export interface Order {
   worker_rating_count: number | null;
   description: string;
   budget_amount: number;
+  city: string | null;
   address: string;
   scheduled_at: string;
   status: OrderStatus;
@@ -90,6 +92,7 @@ export interface ChatMessage {
   id: string;
   order_id: string;
   sender_id: string;
+  sender_role: UserRole | null;
   body: string;
   sent_at: string;
   read_at: string | null;

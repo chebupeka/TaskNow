@@ -3,6 +3,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.models.user import UserRole
+
 
 class MessageCreate(BaseModel):
     body: str = Field(min_length=1, max_length=2000)
@@ -15,6 +17,7 @@ class MessageRead(BaseModel):
     id: UUID
     order_id: UUID
     sender_id: UUID
+    sender_role: UserRole | None = None
     body: str
     sent_at: datetime
     read_at: datetime | None

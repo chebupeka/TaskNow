@@ -29,6 +29,12 @@ async def ensure_local_schema_columns() -> None:
             order_columns = {row[1] for row in order_rows}
             if "budget_amount" not in order_columns:
                 await connection.execute(text("alter table orders add column budget_amount integer not null default 0"))
+            if "city" not in order_columns:
+                await connection.execute(text("alter table orders add column city varchar(120)"))
+            worker_rows = await connection.execute(text("pragma table_info(worker_profiles)"))
+            worker_columns = {row[1] for row in worker_rows}
+            if "city" not in worker_columns:
+                await connection.execute(text("alter table worker_profiles add column city varchar(120)"))
             payment_rows = await connection.execute(text("pragma table_info(payments)"))
             payment_columns = {row[1] for row in payment_rows}
             if "service_fee" not in payment_columns:
@@ -44,6 +50,8 @@ async def ensure_local_schema_columns() -> None:
             await connection.execute(text("alter table users add column if not exists passport_full_name varchar(160)"))
             await connection.execute(text("alter table users add column if not exists passport_number varchar(32)"))
             await connection.execute(text("alter table orders add column if not exists budget_amount integer not null default 0"))
+            await connection.execute(text("alter table orders add column if not exists city varchar(120)"))
+            await connection.execute(text("alter table worker_profiles add column if not exists city varchar(120)"))
             await connection.execute(text("alter type order_status add value if not exists 'disputed'"))
             await connection.execute(text("alter table payments add column if not exists service_fee integer not null default 0"))
             await connection.execute(text("alter table payments add column if not exists worker_amount integer not null default 0"))

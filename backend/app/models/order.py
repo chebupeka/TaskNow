@@ -40,6 +40,7 @@ class Order(Base):
     )
     description: Mapped[str] = mapped_column(Text, nullable=False)
     budget_amount: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    city: Mapped[str | None] = mapped_column(String(120), index=True)
     address: Mapped[str] = mapped_column(String(500), nullable=False)
     scheduled_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True, nullable=False)
     status: Mapped[OrderStatus] = mapped_column(

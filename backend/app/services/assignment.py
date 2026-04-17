@@ -15,11 +15,25 @@ BUSY_ORDER_STATUSES = (
 )
 
 
+def normalize_city(value: str | None) -> str | None:
+    if value is None:
+        return None
+    normalized = " ".join(value.strip().lower().split())
+    return normalized or None
+
+
 async def assign_best_worker(
     session: AsyncSession,
     order: Order,
     exclude_worker_ids: set[UUID] | None = None,
 ) -> User | None:
+    order_city = normalize_city(order.city)
+    if order_city is None:
+        order.worker_id = None
+        order.status = OrderStatus.PENDING
+        order.assigned_at = None
+        return None
+
     busy_worker = (
         select(Order.id)
         .where(Order.worker_id == WorkerProfile.user_id)
@@ -33,22 +47,28 @@ async def assign_best_worker(
         .where(User.role == UserRole.WORKER)
         .where(User.is_active.is_(True))
         .where(WorkerProfile.availability == WorkerAvailability.AVAILABLE)
+        .where(WorkerProfile.city.is_not(None))
         .where(~busy_worker)
-        .order_by(WorkerProfile.rating_avg.desc(), WorkerProfile.completed_orders.desc(), User.created_at.asc())
-        .limit(1)
     )
 
     if exclude_worker_ids:
         statement = statement.where(WorkerProfile.user_id.notin_(exclude_worker_ids))
 
-    row = (await session.execute(statement)).first()
-    if row is None:
+    rows = (await session.execute(statement)).all()
+    candidates = [
+        (profile, worker)
+        for profile, worker in rows
+        if normalize_city(profile.city) == order_city
+    ]
+
+    if not candidates:
         order.worker_id = None
         order.status = OrderStatus.PENDING
         order.assigned_at = None
         return None
 
-    profile, worker = row
+    candidates.sort(key=lambda item: (-item[0].rating_avg, -item[0].completed_orders, item[1].created_at))
+    profile, worker = candidates[0]
     profile.availability = WorkerAvailability.BUSY
     order.worker_id = worker.id
     order.status = OrderStatus.ASSIGNED
@@ -59,6 +79,10 @@ async def assign_best_worker(
 async def assign_next_pending_order_to_worker(session: AsyncSession, worker: User) -> Order | None:
     profile = await session.get(WorkerProfile, worker.id)
     if worker.role != UserRole.WORKER or profile is None or profile.availability != WorkerAvailability.AVAILABLE:
+        return None
+
+    worker_city = normalize_city(profile.city)
+    if worker_city is None:
         return None
 
     busy_order = (
@@ -72,18 +96,25 @@ async def assign_next_pending_order_to_worker(session: AsyncSession, worker: Use
     if busy_order is not None:
         return None
 
-    order = (
-        await session.execute(
-            select(Order)
-            .where(Order.status == OrderStatus.PENDING)
-            .where(Order.worker_id.is_(None))
-            .order_by(Order.created_at.asc())
-            .limit(1)
+    orders = list(
+        (
+            await session.execute(
+                select(Order)
+                .where(Order.status == OrderStatus.PENDING)
+                .where(Order.worker_id.is_(None))
+                .where(Order.city.is_not(None))
+                .order_by(Order.created_at.asc())
+                .limit(100)
+            )
         )
-    ).scalar_one_or_none()
-    if order is None:
+        .scalars()
+        .all()
+    )
+    matching_orders = [order for order in orders if normalize_city(order.city) == worker_city]
+    if not matching_orders:
         return None
 
+    order = matching_orders[0]
     profile.availability = WorkerAvailability.BUSY
     order.worker_id = worker.id
     order.status = OrderStatus.ASSIGNED

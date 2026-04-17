@@ -65,7 +65,7 @@ create table if not exists users (
     phone varchar(32) unique,
     email varchar(255) unique,
     hashed_password varchar(255),
-    avatar_url varchar(1000),
+    avatar_url text,
     identity_status varchar(32) not null default 'not_verified',
     passport_full_name varchar(160),
     passport_number varchar(32),
@@ -74,7 +74,8 @@ create table if not exists users (
 );
 
 alter table users add column if not exists hashed_password varchar(255);
-alter table users add column if not exists avatar_url varchar(1000);
+alter table users add column if not exists avatar_url text;
+alter table users alter column avatar_url type text;
 alter table users add column if not exists identity_status varchar(32) not null default 'not_verified';
 alter table users add column if not exists passport_full_name varchar(160);
 alter table users add column if not exists passport_number varchar(32);
@@ -90,12 +91,15 @@ create table if not exists worker_profiles (
     rating_avg double precision not null default 0,
     rating_count integer not null default 0,
     completed_orders integer not null default 0,
+    city varchar(120),
     current_lat double precision,
     current_lng double precision,
     updated_at timestamptz not null default now()
 );
 
 create index if not exists ix_worker_profiles_availability on worker_profiles (availability);
+create index if not exists ix_worker_profiles_city on worker_profiles (city);
+alter table worker_profiles add column if not exists city varchar(120);
 
 create table if not exists orders (
     id uuid primary key default gen_random_uuid(),
@@ -103,6 +107,7 @@ create table if not exists orders (
     worker_id uuid references users(id) on delete set null,
     description text not null,
     budget_amount integer not null default 0,
+    city varchar(120),
     address varchar(500) not null,
     scheduled_at timestamptz not null,
     status order_status not null default 'pending',
@@ -118,9 +123,11 @@ create index if not exists ix_orders_customer_id on orders (customer_id);
 create index if not exists ix_orders_worker_id on orders (worker_id);
 create index if not exists ix_orders_scheduled_at on orders (scheduled_at);
 create index if not exists ix_orders_status on orders (status);
+create index if not exists ix_orders_city on orders (city);
 create index if not exists ix_orders_status_scheduled_at on orders (status, scheduled_at);
 
 alter table orders add column if not exists budget_amount integer not null default 0;
+alter table orders add column if not exists city varchar(120);
 
 create table if not exists chat_messages (
     id uuid primary key default gen_random_uuid(),

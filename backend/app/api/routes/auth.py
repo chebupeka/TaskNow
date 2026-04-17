@@ -46,6 +46,7 @@ async def build_auth_user(db: AsyncSession, user: User) -> UserRead | WorkerRead
                 rating_avg=profile.rating_avg,
                 rating_count=profile.rating_count,
                 completed_orders=profile.completed_orders,
+                city=profile.city,
                 current_lat=profile.current_lat,
                 current_lng=profile.current_lng,
             )
@@ -130,6 +131,7 @@ async def register(payload: RegisterRequest, db: AsyncSession = Depends(get_db))
                 WorkerProfile(
                     user_id=user.id,
                     skills=payload.skills,
+                    city=payload.city,
                     current_lat=payload.current_lat,
                     current_lng=payload.current_lng,
                 )
@@ -178,6 +180,10 @@ async def update_profile(
     current_user.full_name = payload.full_name
     current_user.email = normalize_email(payload.email)
     current_user.phone = payload.phone
+    if current_user.role == UserRole.WORKER:
+        profile = await db.get(WorkerProfile, current_user.id)
+        if profile is not None:
+            profile.city = payload.city
 
     try:
         await db.commit()

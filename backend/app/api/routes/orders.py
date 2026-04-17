@@ -194,6 +194,7 @@ async def create_order_for_customer(
         customer_id=customer.id,
         description=payload.description,
         budget_amount=payload.budget_amount,
+        city=payload.city,
         address=payload.address,
         scheduled_at=payload.scheduled_at,
         status=OrderStatus.PENDING,
@@ -250,6 +251,7 @@ async def create_order(payload: OrderCreate, db: AsyncSession = Depends(get_db))
         OrderCreateForCurrentUser(
             description=payload.description,
             budget_amount=payload.budget_amount,
+            city=payload.city,
             address=payload.address,
             scheduled_at=payload.scheduled_at,
         ),

@@ -11,6 +11,7 @@ interface CustomerPayload {
 
 interface WorkerPayload extends CustomerPayload {
   skills: string[];
+  city?: string | null;
   current_lat?: number | null;
   current_lng?: number | null;
 }
@@ -19,6 +20,7 @@ interface OrderPayload {
   customer_id: string;
   description: string;
   budget_amount: number;
+  city: string;
   address: string;
   scheduled_at: string;
 }
@@ -30,6 +32,7 @@ interface AuthRegisterPayload {
   role: Exclude<UserRole, "admin">;
   phone?: string | null;
   skills?: string[];
+  city?: string | null;
 }
 
 interface AuthLoginPayload {
@@ -41,6 +44,7 @@ interface ProfileUpdatePayload {
   full_name: string;
   email: string;
   phone?: string | null;
+  city?: string | null;
 }
 
 interface PasswordChangePayload {
@@ -60,6 +64,7 @@ interface IdentityVerificationPayload {
 interface MyOrderPayload {
   description: string;
   budget_amount: number;
+  city: string;
   address: string;
   scheduled_at: string;
 }
@@ -184,8 +189,16 @@ export function getMyWorkerProfile(token: string): Promise<Worker> {
   });
 }
 
-export function setMyWorkerAvailability(token: string, availability: WorkerAvailability): Promise<Worker> {
-  return request<Worker>(`/workers/me/availability?availability=${availability}`, {
+export function setMyWorkerAvailability(
+  token: string,
+  availability: WorkerAvailability,
+  city?: string | null,
+): Promise<Worker> {
+  const searchParams = new URLSearchParams({ availability });
+  if (city) {
+    searchParams.set("city", city);
+  }
+  return request<Worker>(`/workers/me/availability?${searchParams.toString()}`, {
     method: "POST",
     headers: authHeaders(token),
   });

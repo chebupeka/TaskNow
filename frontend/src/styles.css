@@ -1164,6 +1164,29 @@ textarea {
   color: #ffffff;
 }
 
+.message-row.admin {
+  justify-content: center;
+}
+
+.message-row.admin .message-bubble {
+  border: 1px solid rgb(43 108 176 / 0.2);
+  border-radius: 14px;
+  background: #eef6ff;
+  color: #17324d;
+}
+
+.message-author-badge {
+  width: fit-content;
+  border-radius: 6px;
+  padding: 3px 7px;
+  background: #2b6cb0;
+  color: #ffffff;
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
 .message-bubble p {
   overflow-wrap: anywhere;
   white-space: pre-wrap;
@@ -1182,6 +1205,10 @@ textarea {
 
 .message-row.own .message-meta {
   color: rgb(255 255 255 / 0.72);
+}
+
+.message-row.admin .message-meta {
+  color: rgb(23 50 77 / 0.58);
 }
 
 .message-status {

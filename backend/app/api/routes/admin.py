@@ -13,7 +13,7 @@ from app.schemas.admin import AdminDisputeDetail, AdminDisputeResolveRequest
 from app.schemas.messages import MessageRead
 from app.schemas.orders import OrderRead
 from app.schemas.payments import PaymentRead
-from app.services.payments import release_payment_to_worker
+from app.services.payments import clear_refund_amounts, release_payment_to_worker
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -37,7 +37,7 @@ async def get_order_payment(db: AsyncSession, order_id: UUID) -> Payment | None:
 
 
 async def get_order_messages(db: AsyncSession, order_id: UUID) -> list[ChatMessage]:
-    return list(
+    messages = list(
         (
             await db.execute(
                 select(ChatMessage)
@@ -49,6 +49,17 @@ async def get_order_messages(db: AsyncSession, order_id: UUID) -> list[ChatMessa
         .scalars()
         .all()
     )
+    sender_ids = {message.sender_id for message in messages}
+    if not sender_ids:
+        return messages
+    users = {
+        user.id: user
+        for user in (await db.execute(select(User).where(User.id.in_(sender_ids)))).scalars().all()
+    }
+    for message in messages:
+        sender = users.get(message.sender_id)
+        message.sender_role = sender.role if sender else None
+    return messages
 
 
 async def enrich_order_people(db: AsyncSession, order: Order) -> Order:
@@ -158,6 +169,7 @@ async def resolve_dispute(
         order.status = OrderStatus.CANCELED
         order.completed_at = utc_now()
         payment.status = PaymentStatus.REFUNDED
+        clear_refund_amounts(payment)
         add_admin_message(
             db,
             order.id,

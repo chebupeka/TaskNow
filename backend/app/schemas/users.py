@@ -34,8 +34,17 @@ class CustomerCreate(BaseModel):
 
 class WorkerCreate(CustomerCreate):
     skills: list[str] = Field(default_factory=list, max_length=20)
+    city: str | None = Field(default=None, max_length=120)
     current_lat: float | None = None
     current_lng: float | None = None
+
+    @field_validator("city")
+    @classmethod
+    def validate_city(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = " ".join(value.strip().split())
+        return normalized or None
 
 
 class UserRead(BaseModel):
@@ -65,5 +74,6 @@ class WorkerRead(BaseModel):
     rating_avg: float
     rating_count: int
     completed_orders: int
+    city: str | None
     current_lat: float | None
     current_lng: float | None

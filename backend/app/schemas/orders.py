@@ -1,24 +1,49 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.models.order import OrderStatus
+
+
+def normalize_city(value: str | None) -> str | None:
+    if value is None:
+        return None
+    normalized = " ".join(value.strip().split())
+    return normalized or None
 
 
 class OrderCreate(BaseModel):
     customer_id: UUID
     description: str = Field(min_length=5, max_length=2000)
     budget_amount: int = Field(ge=1, le=10_000_000)
+    city: str = Field(min_length=2, max_length=120)
     address: str = Field(min_length=3, max_length=500)
     scheduled_at: datetime
+
+    @field_validator("city")
+    @classmethod
+    def validate_city(cls, value: str) -> str:
+        normalized = normalize_city(value)
+        if normalized is None:
+            raise ValueError("Укажите город")
+        return normalized
 
 
 class OrderCreateForCurrentUser(BaseModel):
     description: str = Field(min_length=5, max_length=2000)
     budget_amount: int = Field(ge=1, le=10_000_000)
+    city: str = Field(min_length=2, max_length=120)
     address: str = Field(min_length=3, max_length=500)
     scheduled_at: datetime
+
+    @field_validator("city")
+    @classmethod
+    def validate_city(cls, value: str) -> str:
+        normalized = normalize_city(value)
+        if normalized is None:
+            raise ValueError("Укажите город")
+        return normalized
 
 
 class OrderRead(BaseModel):
@@ -35,6 +60,7 @@ class OrderRead(BaseModel):
     worker_rating_count: int | None = None
     description: str
     budget_amount: int
+    city: str | None
     address: str
     scheduled_at: datetime
     status: OrderStatus

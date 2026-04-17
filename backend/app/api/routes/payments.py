@@ -7,7 +7,7 @@ from app.models.order import Order
 from app.models.payment import Payment, PaymentStatus, Payout
 from app.models.user import User, UserRole
 from app.schemas.payments import PaymentsDashboard, PaymentRead, PayoutRead, WalletRead
-from app.services.payments import calculate_service_fee, calculate_worker_amount, get_or_create_wallet, pay_out_wallet
+from app.services.payments import calculate_service_fee, calculate_worker_amount, clear_refund_amounts, get_or_create_wallet, pay_out_wallet
 
 router = APIRouter(prefix="/payments", tags=["payments"])
 
@@ -30,6 +30,9 @@ async def enrich_payment_titles(db: AsyncSession, payments: list[Payment]) -> li
             payment.order_title = None
             continue
         payment.order_title = get_order_title(order.description)
+        if payment.status == PaymentStatus.REFUNDED:
+            clear_refund_amounts(payment)
+            continue
         expected_service_fee = calculate_service_fee(payment.amount)
         expected_worker_amount = calculate_worker_amount(payment.amount)
         if payment.service_fee != expected_service_fee or payment.worker_amount != expected_worker_amount:

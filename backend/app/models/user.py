@@ -87,6 +87,7 @@ class WorkerProfile(Base):
     rating_avg: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     rating_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     completed_orders: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    city: Mapped[str | None] = mapped_column(String(120), index=True)
     current_lat: Mapped[float | None] = mapped_column(Float)
     current_lng: Mapped[float | None] = mapped_column(Float)
     updated_at: Mapped[datetime] = mapped_column(

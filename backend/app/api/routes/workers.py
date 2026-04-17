@@ -30,6 +30,7 @@ def build_worker_read(user: User, profile: WorkerProfile) -> WorkerRead:
         rating_avg=profile.rating_avg,
         rating_count=profile.rating_count,
         completed_orders=profile.completed_orders,
+        city=profile.city,
         current_lat=profile.current_lat,
         current_lng=profile.current_lng,
     )
@@ -50,6 +51,7 @@ async def create_worker(payload: WorkerCreate, db: AsyncSession = Depends(get_db
         profile = WorkerProfile(
             user_id=worker.id,
             skills=payload.skills,
+            city=payload.city,
             current_lat=payload.current_lat,
             current_lng=payload.current_lng,
         )
@@ -139,6 +141,7 @@ async def list_my_worker_reviews(
 @router.post("/me/availability", response_model=WorkerRead)
 async def set_my_worker_availability(
     availability: WorkerAvailability,
+    city: str | None = None,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> WorkerRead:
@@ -180,6 +183,15 @@ async def set_my_worker_availability(
             order.worker_id = None
             order.status = OrderStatus.PENDING
             order.assigned_at = None
+
+    if city is not None:
+        profile.city = " ".join(city.strip().split()) or None
+
+    if availability == WorkerAvailability.AVAILABLE and not profile.city:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Укажите город, чтобы получать заказы рядом",
+        )
 
     profile.availability = availability
     if availability == WorkerAvailability.AVAILABLE:

@@ -33,6 +33,20 @@ async def require_chat_access(db: AsyncSession, order_id: UUID, user: User) -> O
     return order
 
 
+async def attach_sender_roles(db: AsyncSession, messages: list[ChatMessage]) -> list[ChatMessage]:
+    sender_ids = {message.sender_id for message in messages}
+    if not sender_ids:
+        return messages
+    users = {
+        user.id: user
+        for user in (await db.execute(select(User).where(User.id.in_(sender_ids)))).scalars().all()
+    }
+    for message in messages:
+        sender = users.get(message.sender_id)
+        message.sender_role = sender.role if sender else None
+    return messages
+
+
 @router.get("/messages/unread-count", response_model=int)
 async def get_unread_messages_count(
     current_user: User = Depends(get_current_user),
@@ -80,7 +94,7 @@ async def list_messages(
         for message in messages:
             await db.refresh(message)
 
-    return messages
+    return await attach_sender_roles(db, messages)
 
 
 @router.post("/orders/{order_id}/messages", response_model=MessageRead, status_code=status.HTTP_201_CREATED)
@@ -100,4 +114,5 @@ async def send_message(
     db.add(message)
     await db.commit()
     await db.refresh(message)
+    message.sender_role = current_user.role
     return message

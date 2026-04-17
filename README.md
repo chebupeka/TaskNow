@@ -1,31 +1,102 @@
 # TaskNow
 
-TaskNow - MVP для автоматизации подбора разнорабочих: заказчик создает задачу, система назначает свободного исполнителя, работник принимает и выполняет заказ, заказчик ставит оценку.
+TaskNow - веб-приложение для подбора исполнителей на срочные бытовые и рабочие задачи. Заказчик создает задачу, система назначает свободного работника, исполнитель принимает заказ, ведет переписку, выполняет работу, а заказчик подтверждает результат и оставляет оценку.
 
-## Что уже заложено
+Проект собран как MVP маркетплейса услуг с личными кабинетами, авторизацией, заказами, чатом, внутренними платежами и админкой для споров.
 
-- Backend: FastAPI, SQLAlchemy async, SQLite для локального dev-режима без Docker; PostgreSQL поддерживается через `DATABASE_URL`.
-- Frontend: Svelte + Vite, один рабочий экран для сценариев заказчика и работника.
-- База: пользователи, профили работников, заказы, уведомления, отзывы и рейтинг.
-- Автоподбор: выбирается доступный активный работник с лучшим рейтингом и без активного заказа.
+## Возможности
 
-## Структура
+### Заказчик
+
+- регистрация и вход по email/паролю;
+- создание задачи с описанием, адресом, временем и бюджетом;
+- просмотр активных и завершенных заказов;
+- просмотр назначенного исполнителя, аватара и рейтинга;
+- чат с исполнителем после принятия заказа;
+- подтверждение завершения работы;
+- оценка и отзыв после выполнения;
+- открытие спора по активному заказу;
+- просмотр платежей, резервов и истории операций;
+- редактирование профиля, телефона, email, пароля и аватара.
+
+### Работник
+
+- регистрация с выбором навыков;
+- статус смены: `На смене` / `Не на смене`;
+- автоматическое получение задачи после выхода на смену;
+- принятие, старт и отправка заказа на подтверждение;
+- чат с заказчиком;
+- просмотр рейтинга и отзывов;
+- платежный кабинет с балансом, резервом и имитацией вывода средств;
+- редактирование профиля, пароля, аватара и mock-подтверждение личности.
+
+### Администратор
+
+- вход через встроенный admin-аккаунт;
+- список открытых споров;
+- просмотр заказа, платежа и чата спора;
+- решение спора: выплата исполнителю или возврат заказчику;
+- системное сообщение в чат спора после решения.
+
+### Система
+
+- JWT-авторизация;
+- автоматическое назначение доступного работника;
+- уведомления;
+- чат по заказу;
+- внутренняя платежная модель без реального эквайринга;
+- комиссия сервиса 10% при выплате исполнителю;
+- возврат заказчику без комиссии;
+- автообновление кабинета без ручного обновления страницы;
+- сохранение текущего экрана после обновления страницы;
+- загрузка и кадрирование аватара.
+
+## Стек
+
+| Часть | Технологии |
+| --- | --- |
+| Backend | Python, FastAPI, SQLAlchemy async, Pydantic |
+| Frontend | Svelte, Vite, TypeScript |
+| База данных | SQLite для локальной разработки, PostgreSQL для сервера |
+| Auth | JWT Bearer token |
+| Production | Linux VPS, Docker Compose, PostgreSQL, Nginx |
+
+## Структура проекта
 
 ```text
-backend/                FastAPI-приложение
-frontend/               Svelte-приложение
-infra/postgres/init/    SQL-инициализация PostgreSQL
-docker-compose.yml      Опциональный PostgreSQL для локальной разработки
+TaskNow/
+  backend/
+    app/
+      api/routes/       API routes
+      core/             настройки и безопасность
+      db/               подключение к базе
+      models/           SQLAlchemy-модели
+      schemas/          Pydantic-схемы
+      services/         бизнес-логика
+    tests/              backend-тесты
+    requirements.txt
+    .env.example
+
+  frontend/
+    src/
+      lib/              API-клиент и типы
+      App.svelte        основной интерфейс
+      styles.css
+    package.json
+    .env.example
+
+  infra/postgres/init/  SQL init для PostgreSQL
+  docker-compose.yml    PostgreSQL для локального Docker-сценария
 ```
 
-## Запуск локально
+## Локальный запуск
 
-На этой машине Docker Desktop использовать нельзя из-за отсутствующей virtualization/WSL, поэтому основной dev-запуск идет через SQLite-файл `backend/tasknow.db`.
+Локально проект проще запускать на SQLite. Docker Desktop на текущей Windows-машине не обязателен.
 
-1. Запустить backend:
+### Backend
 
 ```powershell
-cd backend
+cd C:\Users\User\PycharmProjects\TaskNow\backend
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
@@ -33,53 +104,230 @@ Copy-Item .env.example .env
 uvicorn app.main:app --reload
 ```
 
-Backend будет доступен на `http://localhost:8000`, Swagger - на `http://localhost:8000/docs`.
+Backend:
 
-2. Запустить frontend:
+```text
+http://localhost:8000
+```
+
+Swagger:
+
+```text
+http://localhost:8000/docs
+```
+
+Health-check:
+
+```text
+http://localhost:8000/api/v1/health
+```
+
+### Frontend
 
 ```powershell
-cd frontend
+cd C:\Users\User\PycharmProjects\TaskNow\frontend
 npm install
 Copy-Item .env.example .env
 npm run dev
 ```
 
-Frontend будет доступен на `http://localhost:5173`.
+Frontend:
 
-Если позже появится рабочий Docker/WSL или отдельный PostgreSQL, можно переключить backend обратно на PostgreSQL:
-
-```powershell
-$env:DATABASE_URL = "postgresql+asyncpg://tasknow:tasknow@localhost:5433/tasknow"
+```text
+http://localhost:5173
 ```
 
-PostgreSQL из Docker Compose публикуется на `localhost:5433`, чтобы не конфликтовать с локальной установкой PostgreSQL на `5432`.
+## Переменные окружения
+
+### Backend `.env`
+
+```env
+DATABASE_URL=sqlite+aiosqlite:///./tasknow.db
+CORS_ORIGINS=["http://localhost:5173"]
+CREATE_TABLES_ON_STARTUP=true
+SECRET_KEY=change-this-secret-key-before-production
+ACCESS_TOKEN_EXPIRE_MINUTES=1440
+JWT_ALGORITHM=HS256
+```
+
+Для PostgreSQL:
+
+```env
+DATABASE_URL=postgresql+asyncpg://tasknow:password@postgres:5432/tasknow
+```
+
+### Frontend `.env`
+
+```env
+VITE_API_URL=http://localhost:8000
+```
+
+Важно: `VITE_API_URL` указывается без `/api/v1`. Frontend добавляет `/api/v1` сам.
 
 ## Основные API
 
-- `POST /api/v1/customers` - создать заказчика.
-- `POST /api/v1/workers` - создать работника.
-- `POST /api/v1/auth/register` - создать аккаунт с паролем и получить JWT.
-- `POST /api/v1/auth/login` - войти по email и паролю.
-- `POST /api/v1/auth/token` - form-data логин для Swagger OAuth2 Authorize.
-- `GET /api/v1/auth/me` - получить текущий профиль по Bearer token.
-- `GET /api/v1/workers/me` - получить профиль текущего работника.
-- `POST /api/v1/workers/me/availability?availability=available` - сменить доступность текущего работника.
-- `POST /api/v1/orders` - создать заказ и запустить автоподбор.
-- `POST /api/v1/orders/me` - создать заказ от текущего заказчика по Bearer token.
-- `GET /api/v1/orders/me` - получить заказы текущего заказчика или работника.
-- `GET /api/v1/orders/me/{order_id}` - получить свой заказ.
-- `POST /api/v1/orders/{order_id}/accept` - принять заказ.
-- `POST /api/v1/orders/{order_id}/accept/me` - принять назначенный заказ от текущего работника.
-- `POST /api/v1/orders/{order_id}/decline` - отклонить и попробовать переназначить.
-- `POST /api/v1/orders/{order_id}/decline/me` - отклонить назначенный заказ от текущего работника.
-- `POST /api/v1/orders/{order_id}/start` - начать выполнение.
-- `POST /api/v1/orders/{order_id}/start/me` - начать выполнение от текущего работника.
-- `POST /api/v1/orders/{order_id}/complete` - завершить заказ.
-- `POST /api/v1/orders/{order_id}/complete/me` - завершить заказ от текущего работника.
-- `POST /api/v1/orders/{order_id}/review` - поставить оценку.
-- `POST /api/v1/orders/{order_id}/review/me` - поставить оценку от текущего заказчика.
-- `GET /api/v1/notifications?user_id=...` - получить уведомления пользователя.
-- `GET /api/v1/notifications/me` - получить свои уведомления по Bearer token.
-- `POST /api/v1/notifications/{notification_id}/read/me` - отметить свое уведомление прочитанным.
+### Auth
 
-На этапе MVP старые order endpoints еще принимают `customer_id` и `worker_id` явно для быстрой ручной проверки. Frontend уже использует auth и `/me` endpoints; следующий логичный слой - проверить сценарий на запущенном backend и затем закрыть старые публичные бизнес endpoints.
+- `POST /api/v1/auth/register` - регистрация.
+- `POST /api/v1/auth/login` - вход.
+- `POST /api/v1/auth/token` - OAuth2 form-login для Swagger.
+- `GET /api/v1/auth/me` - текущий профиль.
+- `PUT /api/v1/auth/me/profile` - обновление профиля.
+- `PUT /api/v1/auth/me/password` - смена пароля.
+- `PUT /api/v1/auth/me/avatar` - обновление аватара.
+- `POST /api/v1/auth/me/identity` - mock-подтверждение личности.
+
+### Workers
+
+- `GET /api/v1/workers` - список работников.
+- `GET /api/v1/workers/me` - профиль текущего работника.
+- `POST /api/v1/workers/me/availability` - выход на смену или завершение смены.
+- `GET /api/v1/workers/me/reviews` - отзывы текущего работника.
+
+### Orders
+
+- `POST /api/v1/orders/me` - создать заказ от текущего заказчика.
+- `GET /api/v1/orders/me` - список заказов текущего пользователя.
+- `GET /api/v1/orders/me/{order_id}` - один свой заказ.
+- `POST /api/v1/orders/{order_id}/accept/me` - принять заказ.
+- `POST /api/v1/orders/{order_id}/decline/me` - отклонить заказ.
+- `POST /api/v1/orders/{order_id}/start/me` - начать работу.
+- `POST /api/v1/orders/{order_id}/complete/me` - отправить на подтверждение.
+- `POST /api/v1/orders/{order_id}/confirm-complete/me` - подтвердить выполнение.
+- `POST /api/v1/orders/{order_id}/review/me` - оставить отзыв.
+- `POST /api/v1/orders/{order_id}/dispute/me` - открыть спор.
+
+### Messages
+
+- `GET /api/v1/orders/{order_id}/messages` - сообщения по заказу.
+- `POST /api/v1/orders/{order_id}/messages` - отправить сообщение.
+- `GET /api/v1/messages/unread-count` - счетчик непрочитанных сообщений.
+
+### Payments
+
+- `GET /api/v1/payments/me` - платежный кабинет.
+- `POST /api/v1/payments/me/payout` - имитация вывода средств работником.
+
+### Notifications
+
+- `GET /api/v1/notifications/me` - уведомления текущего пользователя.
+- `POST /api/v1/notifications/{notification_id}/read/me` - отметить уведомление прочитанным.
+
+### Admin
+
+- `GET /api/v1/admin/disputes` - список открытых споров.
+- `GET /api/v1/admin/disputes/{order_id}` - детали спора.
+- `POST /api/v1/admin/disputes/{order_id}/resolve` - решение спора.
+
+## Роли и демо-вход
+
+Пользователи создаются через регистрацию в интерфейсе.
+
+Администратор:
+
+```text
+login: admin
+password: admin
+```
+
+Для публичного сервера пароль администратора нужно менять в коде или выносить в переменные окружения перед реальным использованием.
+
+## Проверки
+
+Backend:
+
+```powershell
+cd backend
+.\.venv\Scripts\Activate.ps1
+python -m compileall app
+pytest -p no:cacheprovider
+```
+
+Frontend:
+
+```powershell
+cd frontend
+npm run build
+```
+
+Health-check:
+
+```powershell
+curl http://localhost:8000/api/v1/health
+```
+
+Ожидаемый ответ:
+
+```json
+{"status":"ok"}
+```
+
+## Серверный деплой
+
+На сервере проект запускается через Docker Compose: PostgreSQL, backend, frontend и Nginx reverse proxy.
+
+Обычное обновление сервера:
+
+```bash
+cd /opt/tasknow
+git pull
+docker compose -f docker-compose.prod.yml up -d --build
+```
+
+Проверка контейнеров:
+
+```bash
+docker compose -f docker-compose.prod.yml ps
+```
+
+Проверка backend:
+
+```bash
+curl http://127.0.0.1:8000/api/v1/health
+```
+
+Проверка API через Nginx:
+
+```bash
+curl http://127.0.0.1/api/v1/health
+```
+
+Логи backend:
+
+```bash
+docker compose -f docker-compose.prod.yml logs --tail=80 backend
+```
+
+## Обновление проекта
+
+На компьютере:
+
+```powershell
+cd C:\Users\User\PycharmProjects\TaskNow
+git add .
+git commit -m "Update project"
+git push
+```
+
+На сервере:
+
+```bash
+cd /opt/tasknow
+git pull
+docker compose -f docker-compose.prod.yml up -d --build
+```
+
+После обновления frontend в браузере желательно сделать жесткое обновление:
+
+```text
+Ctrl + F5
+```
+
+## Важные замечания
+
+- Настоящие `.env` файлы не должны попадать в Git.
+- SQLite подходит для локальной разработки.
+- PostgreSQL используется на сервере.
+- `CREATE_TABLES_ON_STARTUP=true` включает автоматическое создание таблиц и легкие startup-миграции.
+- Аватары хранятся как `data URL` в поле `avatar_url`.
+- Внутренние платежи являются имитацией и не подключены к реальному эквайрингу.
