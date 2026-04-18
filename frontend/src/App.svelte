@@ -95,24 +95,24 @@
   let rawPaymentBadgeCount = 0;
   let seenPaymentBadgeCount = 0;
 
-  let loginEmail = "customer@tasknow.local";
-  let loginPassword = "password123";
-  let registerName = "Мария Иванова";
-  let registerEmail = "customer@tasknow.local";
-  let registerPhone = "+7 900 000-10-01";
-  let registerPassword = "password123";
-  let registerCity = "Москва";
-  let selectedSkills: string[] = ["Погрузка"];
+  let loginEmail = "";
+  let loginPassword = "";
+  let registerName = "";
+  let registerEmail = "";
+  let registerPhone = "";
+  let registerPassword = "";
+  let registerCity = "";
+  let selectedSkills: string[] = [];
 
-  let taskTitle = "Разгрузить мебель";
-  let taskDescription = "Разгрузить мебель и аккуратно поднять коробки на второй этаж.";
-  let taskBudget = "5000";
+  let taskTitle = "";
+  let taskDescription = "";
+  let taskBudget = "";
   let taskCategory = categories[0];
-  let taskCity = "Москва";
-  let taskLocation = "Москва, ул. Тверская, 12";
-  let taskScheduledAt = localDateTimeInput(Date.now() + 2 * 60 * 60 * 1000);
-  let reviewScore = 5;
-  let reviewComment = "Работа выполнена аккуратно";
+  let taskCity = "";
+  let taskLocation = "";
+  let taskScheduledAt = "";
+  let reviewScore: number | undefined = undefined;
+  let reviewComment = "";
   let settingsName = "";
   let settingsEmail = "";
   let settingsPhone = "";
@@ -625,6 +625,9 @@
     if (!accessToken || role !== "customer") {
       throw new Error("Оценку может поставить только заказчик");
     }
+    if (reviewScore == null) {
+      throw new Error("Укажите оценку от 1 до 5");
+    }
     await reviewMyOrder(accessToken, order.id, reviewScore, reviewComment);
     await refreshSession();
     flashNotice("Оценка сохранена");
@@ -964,7 +967,7 @@
             <p>Продолжите работу с заказами, сообщениями и выплатами.</p>
             <img src={authImage} alt="Электрик за работой" />
           </div>
-          <form class="auth-form" on:submit|preventDefault={() => run(submitLogin)}>
+          <form autocomplete="off" class="auth-form" on:submit|preventDefault={() => run(submitLogin)}>
             <label>
               Email или логин
               <input bind:value={loginEmail} type="text" placeholder="you@company.ru или admin" required />
@@ -990,7 +993,7 @@
             <p>Выберите роль и начните принимать или размещать задачи.</p>
             <img src={workerImage} alt="Исполнитель на объекте" />
           </div>
-          <form class="auth-form" on:submit|preventDefault={() => run(submitRegister)}>
+          <form autocomplete="off" class="auth-form" on:submit|preventDefault={() => run(submitRegister)}>
             <label>
               Name
               <input bind:value={registerName} placeholder="Мария Иванова" required />
@@ -1560,7 +1563,7 @@
           <h1>Опишите работу, а TaskNow найдет исполнителя</h1>
         </div>
         <div class="create-grid">
-          <form class="task-form" on:submit|preventDefault={() => run(submitTask)}>
+          <form autocomplete="off" class="task-form" on:submit|preventDefault={() => run(submitTask)}>
             <label>
               Title
               <input bind:value={taskTitle} placeholder="Разгрузить мебель" required />
