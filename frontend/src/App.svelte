@@ -106,7 +106,7 @@
 
   let taskTitle = "";
   let taskDescription = "";
-  let taskBudget = "";
+  let taskBudget: string | number | undefined = "";
   let taskCategory = categories[0];
   let taskCity = "";
   let taskLocation = "";
@@ -217,8 +217,13 @@
     return user.role;
   }
 
-  function formatPrice(value: string) {
-    const amount = Number(value.replace(/\D/g, "")) || 0;
+  function parseMoneyInput(value: string | number | undefined) {
+    if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+    return Number((value ?? "").replace(/\D/g, "")) || 0;
+  }
+
+  function formatPrice(value: string | number | undefined) {
+    const amount = parseMoneyInput(value);
     return new Intl.NumberFormat("ru-RU").format(amount) + " ₽";
   }
 
@@ -506,7 +511,7 @@
     }
     await createMyOrder(accessToken, {
       description: makeDescription(),
-      budget_amount: Number(taskBudget.replace(/\D/g, "")) || 0,
+      budget_amount: parseMoneyInput(taskBudget),
       city: taskCity,
       address: taskLocation,
       scheduled_at: new Date(taskScheduledAt).toISOString(),
